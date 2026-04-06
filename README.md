@@ -79,6 +79,40 @@ exit    # 退出程序
 ```bash
 curl -X POST http://localhost:5000/api/trigger_query
 ```
+或者用 PowerShell
+```bash
+Invoke-WebRequest -Method POST http://localhost:5000/api/trigger_query
+```
+
+---
+
+## Docker 部署
+
+**1. 使用预构建镜像**
+
+```bash
+docker pull youzijiang/electricity-monitor:latest
+```
+
+**2. 准备配置文件和楼栋数据**
+
+```bash
+cp config.example.yaml config.yaml
+# 编辑 config.yaml 填入学号和密码
+```
+
+**3. 启动**
+
+```bash
+docker compose up -d
+```
+
+**4. 制作镜像（开发者）**
+
+```bash
+docker build -t youzijiang/electricity-monitor:latest .
+docker push youzijiang/electricity-monitor:latest
+```
 
 ---
 

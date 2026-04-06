@@ -1,0 +1,7 @@
+config.yaml
+electricity.db
+.git/
+__pycache__/
+*.pyc
+*.pyo
+*.har

@@ -1,0 +1,19 @@
+name: csust-electricity-monitor
+
+services:
+  electricity-monitor:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./buildings:/app/buildings:ro
+      - electricity_data:/app/data
+    environment:
+      - AUTH_USERNAME=${AUTH_USERNAME:-}
+      - AUTH_PASSWORD=${AUTH_PASSWORD:-}
+      - DB_PATH=/app/data/electricity.db
+    restart: unless-stopped
+
+volumes:
+  electricity_data:
