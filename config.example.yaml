@@ -1,0 +1,36 @@
+server:
+  host: "0.0.0.0"
+  port: 5000
+
+# CAS 统一身份认证
+# Docker 部署时可通过环境变量 AUTH_USERNAME / AUTH_PASSWORD 覆盖
+auth:
+  username: "你的学号"
+  password: "你的统一身份认证密码"
+  cas_url: "https://authserver.csust.edu.cn/authserver"
+  service_url: "https://hxyxh5.csust.edu.cn/berserker-auth/cas/login/wisedu?targetUrl=https://hxyxh5.csust.edu.cn/plat/?name=loginTransit"
+
+# 电费查询参数
+api:
+  base_url: "https://hxyxh5.csust.edu.cn"
+  xiaoqu_id: "1"
+  loudong_id: "楼栋ID"
+  room_id: "房间ID"
+  feeitemid: "448"
+  type: "IEC"
+  level: "3"
+
+# 查询调度（每天固定时间点查询，24小时制）
+schedule:
+  query_hours: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]
+  start_immediately: false
+
+# 寝室列表（自动扫描 buildings/ 目录下所有 json 文件）
+rooms:
+  buildings_dir: "buildings"
+  query_interval_ms: 2000
+
+# 数据库
+# Docker 部署时可通过环境变量 DB_PATH 覆盖
+database:
+  path: "electricity.db"

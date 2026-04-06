@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电费查询 - 长沙理工大学</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; color: #333; }
+.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 24px; text-align: center; }
+.header h1 { font-size: 22px; margin-bottom: 8px; }
+.status-bar { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; font-size: 14px; opacity: 0.9; }
+.room-bar { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 14px; }
+.room-bar label { font-size: 14px; opacity: 0.9; }
+.room-bar select { padding: 5px 10px; border-radius: 6px; border: none; font-size: 14px; min-width: 160px; cursor: pointer; }
+.container { max-width: 1000px; margin: 0 auto; padding: 16px; }
+.card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.card h2 { font-size: 16px; margin-bottom: 12px; color: #555; }
+.big-number { font-size: 48px; font-weight: 700; color: #667eea; text-align: center; }
+.big-number small { font-size: 18px; color: #999; }
+.chart-box { height: 300px; }
+.controls { display: flex; gap: 8px; margin-bottom: 12px; }
+.controls button { padding: 4px 14px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; }
+.controls button.active { background: #667eea; color: #fff; border-color: #667eea; }
+.export-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+.export-bar button { padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; color: #fff; }
+.btn-csv { background: #52c41a; }
+.btn-excel { background: #1890ff; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+th { background: #fafafa; font-weight: 600; }
+.error { color: #ff4d4f; }
+.page-controls { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+.page-controls button { padding: 4px 12px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; }
+.page-controls button:disabled { opacity: 0.4; cursor: default; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>长沙理工大学 · 电费监控</h1>
+  <div class="status-bar">
+    <span>上次查询: <b id="lastTime">--</b></span>
+    <span>下次查询: <b id="nextRun">--</b></span>
+    <span id="errorInfo"></span>
+  </div>
+  <div class="room-bar">
+    <label for="buildingSelect">楼栋：</label>
+    <select id="buildingSelect" onchange="onBuildingChange()">
+      <option value="">-- 加载中 --</option>
+    </select>
+    <label for="roomSelect">宿舍：</label>
+    <select id="roomSelect" onchange="onRoomChange()">
+      <option value="">-- 请先选楼栋 --</option>
+    </select>
+  </div>
+</div>
+<div class="container">
+  <div class="card" style="text-align:center">
+    <h2>当前剩余电量</h2>
+    <div class="big-number"><span id="remaining">--</span> <small>kWh</small></div>
+  </div>
+
+  <div class="card">
+    <h2>电量趋势</h2>
+    <div class="controls" id="trendBtns">
+      <button data-days="1">24h</button>
+      <button data-days="7" class="active">7天</button>
+      <button data-days="30">30天</button>
+      <button data-days="0">全部</button>
+    </div>
+    <div class="chart-box" id="trendChart"></div>
+  </div>
+
+  <div class="card">
+    <h2>每日用电量</h2>
+    <div class="controls" id="usageBtns">
+      <button data-days="7">7天</button>
+      <button data-days="30" class="active">30天</button>
+      <button data-days="0">全部</button>
+    </div>
+    <div class="chart-box" id="usageChart"></div>
+  </div>
+
+  <div class="card">
+    <h2>楼栋电量对比</h2>
+    <div class="chart-box" style="height:400px" id="buildingChart"></div>
+  </div>
+
+  <div class="card">
+    <h2>历史记录</h2>
+    <div class="export-bar">
+      <button class="btn-csv" onclick="exportData('csv')">导出 CSV</button>
+      <button class="btn-excel" onclick="exportData('excel')">导出 Excel</button>
+    </div>
+    <table>
+      <thead><tr><th>时间</th><th>剩余(kWh)</th><th>总量(kWh)</th><th>已用(kWh)</th></tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="page-controls">
+      <button id="prevPage" onclick="changePage(-1)">上一页</button>
+      <span id="pageInfo"></span>
+      <button id="nextPage" onclick="changePage(1)">下一页</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>导出全部数据</h2>
+    <div class="export-bar">
+      <button class="btn-csv" onclick="location.href='/api/export?format=csv'">全部导出 CSV</button>
+      <button class="btn-excel" onclick="location.href='/api/export?format=excel'">全部导出 Excel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const trendChart = echarts.init(document.getElementById('trendChart'));
+const usageChart = echarts.init(document.getElementById('usageChart'));
+const buildingChart = echarts.init(document.getElementById('buildingChart'));
+let allReadings = [], currentPage = 0, pageSize = 20;
+let currentRoomId = '', currentBuildingId = '';
+let trendDays = 7, usageDays = 30;
+
+async function fetchJSON(url) { return (await fetch(url)).json(); }
+function roomParam() { return currentRoomId ? '&room_id=' + currentRoomId : ''; }
+
+function getCookie(name) {
+  const m = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function setCookie(name, value, days) {
+  const exp = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + exp + '; path=/';
+}
+
+async function loadRooms(buildingId) {
+  const url = buildingId ? '/api/rooms?building_id=' + buildingId : '/api/rooms';
+  const rooms = await fetchJSON(url);
+  const sel = document.getElementById('roomSelect');
+  sel.innerHTML = rooms.map(r =>
+    `<option value="${r.room_id}">${r.room_name || r.room_id}</option>`
+  ).join('');
+  const saved = getCookie('selected_room_id');
+  const match = rooms.find(r => r.room_id === saved);
+  currentRoomId = match ? match.room_id : (rooms.length ? rooms[0].room_id : '');
+  sel.value = currentRoomId;
+  loadAll();
+}
+
+async function loadBuildings() {
+  const buildings = await fetchJSON('/api/buildings');
+  const sel = document.getElementById('buildingSelect');
+  sel.innerHTML = buildings.map(b =>
+    `<option value="${b.building_id}">${b.building_name || b.building_id}</option>`
+  ).join('');
+  const saved = getCookie('selected_building_id');
+  const match = buildings.find(b => b.building_id === saved);
+  const chosen = match ? match.building_id : (buildings.length ? buildings[0].building_id : '');
+  sel.value = chosen;
+  currentBuildingId = chosen;
+  await loadRooms(chosen);
+}
+
+async function onBuildingChange() {
+  const buildingId = document.getElementById('buildingSelect').value;
+  currentBuildingId = buildingId;
+  setCookie('selected_building_id', buildingId, 365);
+  await loadRooms(buildingId);
+}
+
+function onRoomChange() {
+  currentRoomId = document.getElementById('roomSelect').value;
+  setCookie('selected_room_id', currentRoomId, 365);
+  loadAll();
+}
+
+async function loadLatest() {
+  const rows = await fetchJSON('/api/readings?days=1' + roomParam());
+  const latest = rows.length ? rows[rows.length - 1] : null;
+  if (latest) {
+    document.getElementById('remaining').textContent = latest.remaining_kwh.toFixed(2);
+    document.getElementById('lastTime').textContent = latest.timestamp;
+  } else {
+    document.getElementById('remaining').textContent = '--';
+    document.getElementById('lastTime').textContent = '--';
+  }
+}
+
+async function loadStatus() {
+  const s = await fetchJSON('/api/status');
+  document.getElementById('nextRun').textContent = s.next_run || '--';
+  const el = document.getElementById('errorInfo');
+  if (s.last_error) { el.innerHTML = '<span class="error">错误: ' + s.last_error + '</span>'; }
+  else { el.textContent = ''; }
+}
+
+async function loadTrend(days) {
+  trendDays = days;
+  const data = await fetchJSON('/api/readings?days=' + days + roomParam());
+  trendChart.setOption({
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: data.map(r => r.timestamp.slice(5, 16)) },
+    yAxis: { type: 'value', name: 'kWh' },
+    series: [{ data: data.map(r => r.remaining_kwh), type: 'line', smooth: true,
+      areaStyle: { color: 'rgba(102,126,234,0.15)' }, lineStyle: { color: '#667eea' },
+      itemStyle: { color: '#667eea' } }],
+    grid: { left: 50, right: 20, top: 30, bottom: 30 }
+  });
+}
+
+async function loadUsage(days) {
+  usageDays = days;
+  const data = await fetchJSON('/api/daily_usage?days=' + days + roomParam());
+  usageChart.setOption({
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: data.map(r => r.date.slice(5)) },
+    yAxis: { type: 'value', name: 'kWh' },
+    series: [{ data: data.map(r => r.usage), type: 'bar',
+      itemStyle: { color: '#764ba2', borderRadius: [4, 4, 0, 0] } }],
+    grid: { left: 50, right: 20, top: 30, bottom: 30 }
+  });
+}
+
+function renderTable() {
+  const start = currentPage * pageSize;
+  const page = allReadings.slice(start, start + pageSize);
+  document.getElementById('tableBody').innerHTML = page.map(r =>
+    `<tr><td>${r.timestamp}</td><td>${r.remaining_kwh.toFixed(2)}</td><td>${r.total_kwh.toFixed(2)}</td><td>${r.used_kwh.toFixed(2)}</td></tr>`
+  ).join('');
+  const total = Math.ceil(allReadings.length / pageSize);
+  document.getElementById('pageInfo').textContent = `${currentPage + 1} / ${total || 1}`;
+  document.getElementById('prevPage').disabled = currentPage <= 0;
+  document.getElementById('nextPage').disabled = currentPage >= total - 1;
+}
+
+function changePage(delta) { currentPage += delta; renderTable(); }
+
+async function loadTable() {
+  allReadings = (await fetchJSON('/api/readings?days=0' + roomParam())).reverse();
+  currentPage = 0;
+  renderTable();
+}
+
+function exportData(fmt) { location.href = '/api/export?format=' + fmt + roomParam(); }
+
+function bindBtns(containerId, callback) {
+  const el = document.getElementById(containerId);
+  el.addEventListener('click', e => {
+    if (e.target.tagName !== 'BUTTON') return;
+    el.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    callback(parseInt(e.target.dataset.days));
+  });
+}
+
+function onRoomChange() {
+  currentRoomId = document.getElementById('roomSelect').value;
+  setCookie('selected_room_id', currentRoomId, 365);
+  loadAll();
+}
+
+async function loadBuildingChart() {
+  const rows = await fetchJSON('/api/latest_per_room' + (currentBuildingId ? '?building_id=' + currentBuildingId : ''));
+  const sorted = rows
+    .filter(r => r.remaining_kwh >= 0)
+    .sort((a, b) => a.room_name.localeCompare(b.room_name, 'zh'));
+  buildingChart.setOption({
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: sorted.map(r => r.room_name || r.room_id), axisLabel: { rotate: 45, fontSize: 11 } },
+    yAxis: { type: 'value', name: 'kWh' },
+    series: [{ data: sorted.map(r => ({
+        value: r.remaining_kwh,
+        itemStyle: { color: r.room_id === currentRoomId ? '#ff4d4f' : '#667eea', borderRadius: [3, 3, 0, 0] }
+      })), type: 'bar' }],
+    grid: { left: 50, right: 20, top: 20, bottom: 80 }
+  });
+}
+
+function loadAll() { loadLatest(); loadTrend(trendDays); loadUsage(usageDays); loadTable(); loadBuildingChart(); }
+
+bindBtns('trendBtns', loadTrend);
+bindBtns('usageBtns', loadUsage);
+
+loadBuildings();
+loadStatus();
+setInterval(() => { loadLatest(); loadStatus(); }, 60000);
+window.addEventListener('resize', () => { trendChart.resize(); usageChart.resize(); });
+</script>
+</body>
+</html>
