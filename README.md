@@ -5,7 +5,7 @@
 ## 功能
 
 - 通过统一身份认证自动登录，无需手动操作
-- 每天固定时间点自动查询（可配置），支持控制台手动触发
+- 每小时自动查询一次（可配置），支持控制台手动触发
 - 支持多楼栋、多宿舍批量查询，请求间隔可配置
 - 数据存储到本地 SQLite 数据库
 - Web 仪表盘：
@@ -14,31 +14,36 @@
   - 楼栋内所有宿舍当前电量对比图（当前宿舍红色高亮）
   - 历史数据表格，支持按宿舍或全量导出 CSV / Excel
 
-## 快速开始
+---
 
-**1. 安装依赖**
+## Docker 部署（推荐）
 
-```bash
-pip install -r requirements.txt
-```
+无需克隆代码，直接拉取镜像运行。
 
-**2. 修改配置**
+**1. 首次启动，自动生成配置文件**
 
 ```bash
-cp config.example.yaml config.yaml
+mkdir csust-electricity-monitor && cd csust-electricity-monitor
+docker run --rm -v ./data:/data youzijiang/csust-electricity-monitor:latest
 ```
 
-编辑 `config.yaml`，填入学号和统一身份认证密码：
+容器会在 `./data/` 目录下生成 `config.yaml` 和示例 `buildings/`，然后自动退出并提示你编辑配置。
+
+**2. 编辑配置，填入学号和密码**
+
+```bash
+nano data/config.yaml
+```
 
 ```yaml
 auth:
-  username: "学号"
-  password: "统一身份认证密码"
+  username: "你的学号"
+  password: "你的统一身份认证密码"
 ```
 
-**3. 添加楼栋数据**
+**4. 添加楼栋数据**
 
-将楼栋宿舍 json 文件放入 `buildings/` 目录，文件名格式为：
+将楼栋宿舍 json 文件放入 `data/buildings/` 目录，文件名格式：
 
 ```
 楼栋名_楼栋id.json
@@ -57,6 +62,62 @@ auth:
 }
 ```
 
+**5. 正式启动**
+
+```bash
+docker run -d \
+  -v ./data:/data \
+  -p 5000:5000 \
+  -e TZ=Asia/Shanghai \
+  --restart unless-stopped \
+  --name csust-electricity-monitor \
+  youzijiang/csust-electricity-monitor:latest
+```
+
+打开浏览器访问 `http://服务器IP:5000`
+
+**6. 查看日志**
+
+```bash
+docker logs -f csust-electricity-monitor
+```
+
+**升级镜像**
+
+```bash
+docker stop csust-electricity-monitor && docker rm csust-electricity-monitor
+docker pull youzijiang/csust-electricity-monitor:latest
+docker run -d \
+  -v ./data:/data \
+  -p 5000:5000 \
+  -e TZ=Asia/Shanghai \
+  --restart unless-stopped \
+  --name csust-electricity-monitor \
+  youzijiang/csust-electricity-monitor:latest
+```
+
+---
+
+## 本地运行
+
+**1. 安装依赖**
+
+```bash
+pip install -r requirements.txt
+```
+
+**2. 修改配置**
+
+```bash
+cp config.example.yaml config.yaml
+```
+
+编辑 `config.yaml`，填入学号和统一身份认证密码。
+
+**3. 添加楼栋数据**
+
+将楼栋 json 文件放入 `buildings/` 目录（格式同上）。
+
 **4. 启动**
 
 ```bash
@@ -67,7 +128,7 @@ python main.py
 
 **5. 手动触发查询**
 
-程序启动后在终端输入指令：
+程序启动后在终端输入：
 
 ```
 query   # 立即查询所有宿舍
@@ -77,43 +138,11 @@ exit    # 退出程序
 或通过 API 触发：
 
 ```bash
+# Linux/macOS
 curl -X POST http://localhost:5000/api/trigger_query
-```
-或者用 PowerShell
-```bash
+
+# Windows PowerShell
 Invoke-WebRequest -Method POST http://localhost:5000/api/trigger_query
-```
-
----
-
-## Docker 部署
-
-**1. 克隆仓库**
-
-```bash
-git clone https://github.com/youzijiang/csust-electricity-monitor.git
-cd csust-electricity-monitor
-```
-
-**2. 准备配置文件和楼栋数据**
-
-```bash
-cp config.example.yaml config.yaml
-# 编辑 config.yaml 填入学号和密码
-```
-
-**3. 构建并启动**
-
-```bash
-docker compose up -d --build
-```
-
-打开浏览器访问 `http://服务器IP:5000`
-
-**4. 查看日志**
-
-```bash
-docker compose logs -f
 ```
 
 ---
@@ -123,11 +152,15 @@ docker compose logs -f
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
 | `server.port` | Web 服务端口 | 5000 |
-| `schedule.query_hours` | 每天查询的时间点列表 | [0,2,4,...,22] |
+| `schedule.query_hours` | 每天查询的时间点列表 | 每小时一次 |
 | `schedule.start_immediately` | 启动时立即查询一次 | false |
 | `rooms.buildings_dir` | 楼栋 json 文件目录 | buildings |
 | `rooms.query_interval_ms` | 每次请求间隔（毫秒） | 2000 |
 | `database.path` | 数据库文件路径 | electricity.db |
+
+Docker 部署时 `buildings_dir` 和 `database.path` 由容器自动设置，无需手动修改。
+
+---
 
 ## 项目结构
 
@@ -139,6 +172,7 @@ docker compose logs -f
 ├── scheduler.py          # 定时调度
 ├── web.py                # Web 仪表盘后端
 ├── export.py             # CSV/Excel 导出
+├── entrypoint.sh         # Docker 启动脚本
 ├── buildings/            # 楼栋宿舍数据（楼栋名_楼栋id.json）
 ├── templates/
 │   └── index.html        # 仪表盘页面
