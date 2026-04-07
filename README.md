@@ -88,10 +88,11 @@ Invoke-WebRequest -Method POST http://localhost:5000/api/trigger_query
 
 ## Docker 部署
 
-**1. 使用预构建镜像**
+**1. 克隆仓库**
 
 ```bash
-docker pull youzijiang/electricity-monitor:latest
+git clone https://github.com/youzijiang/csust-electricity-monitor.git
+cd csust-electricity-monitor
 ```
 
 **2. 准备配置文件和楼栋数据**
@@ -101,17 +102,18 @@ cp config.example.yaml config.yaml
 # 编辑 config.yaml 填入学号和密码
 ```
 
-**3. 启动**
+**3. 构建并启动**
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-**4. 制作镜像（开发者）**
+打开浏览器访问 `http://服务器IP:5000`
+
+**4. 查看日志**
 
 ```bash
-docker build -t youzijiang/electricity-monitor:latest .
-docker push youzijiang/electricity-monitor:latest
+docker compose logs -f
 ```
 
 ---

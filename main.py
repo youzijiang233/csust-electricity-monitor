@@ -54,7 +54,7 @@ def main():
 
     sched.start()
 
-    app = create_app(db, sched)
+    app = create_app(db, sched, config)
     host = config["server"]["host"]
     port = config["server"]["port"]
 

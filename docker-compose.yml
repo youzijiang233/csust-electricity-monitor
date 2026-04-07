@@ -13,6 +13,7 @@ services:
       - AUTH_USERNAME=${AUTH_USERNAME:-}
       - AUTH_PASSWORD=${AUTH_PASSWORD:-}
       - DB_PATH=/app/data/electricity.db
+      - TZ=Asia/Shanghai
     restart: unless-stopped
 
 volumes:

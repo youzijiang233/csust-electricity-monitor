@@ -3,7 +3,6 @@ server:
   port: 5000
 
 # CAS 统一身份认证
-# Docker 部署时可通过环境变量 AUTH_USERNAME / AUTH_PASSWORD 覆盖
 auth:
   username: "你的学号"
   password: "你的统一身份认证密码"

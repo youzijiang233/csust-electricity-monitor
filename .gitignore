@@ -1,5 +1,4 @@
 config.yaml
-buildings/
 electricity.db
 data/
 *.har

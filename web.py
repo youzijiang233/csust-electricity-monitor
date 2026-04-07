@@ -1,12 +1,27 @@
 """Flask Web 仪表盘"""
 
+from datetime import datetime, timedelta
+
 from flask import Flask, jsonify, request, render_template, Response
 
 from db import Database
 from export import to_csv, to_excel
 
 
-def create_app(db: Database, scheduler=None) -> Flask:
+def _calc_next_run(query_hours: list[int]) -> str:
+    now = datetime.now()
+    hours = sorted(query_hours)
+    for h in hours:
+        candidate = now.replace(hour=h, minute=0, second=0, microsecond=0)
+        if candidate > now:
+            return candidate.strftime("%Y-%m-%dT%H:%M:%S")
+    # 今天没有了，取明天第一个
+    tomorrow = now + timedelta(days=1)
+    candidate = tomorrow.replace(hour=hours[0], minute=0, second=0, microsecond=0)
+    return candidate.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def create_app(db: Database, scheduler=None, config: dict = None) -> Flask:
     app = Flask(__name__)
 
     @app.route("/")
@@ -57,11 +72,15 @@ def create_app(db: Database, scheduler=None) -> Flask:
         import threading
         threading.Thread(target=scheduler._query_and_store, daemon=True).start()
         return jsonify({"status": "started"})
-        status = {
-            "next_run": scheduler.get_next_run() if scheduler else "",
+
+    @app.route("/api/status")
+    def api_status():
+        query_hours = (config or {}).get("schedule", {}).get("query_hours", [])
+        next_run = _calc_next_run(query_hours) if query_hours else ""
+        return jsonify({
+            "next_run": next_run,
             "last_error": scheduler.last_error if scheduler else None,
-        }
-        return jsonify(status)
+        })
 
     @app.route("/api/export")
     def api_export():
