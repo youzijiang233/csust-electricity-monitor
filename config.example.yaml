@@ -32,3 +32,8 @@ rooms:
 # Docker 部署时可通过环境变量 DB_PATH 覆盖
 database:
   path: "electricity.db"
+
+# 仪表盘显示
+dashboard:
+  # 电量趋势图 Y 轴模式: adaptive（自适应，不从0开始）或 zero（从0开始）
+  trend_yaxis: "adaptive"

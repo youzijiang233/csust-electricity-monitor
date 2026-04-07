@@ -90,6 +90,7 @@ def create_app(db: Database, scheduler=None, config: dict = None) -> Flask:
         return jsonify({
             "next_run": next_run,
             "last_error": scheduler.last_error if scheduler else None,
+            "trend_yaxis": (config or {}).get("dashboard", {}).get("trend_yaxis", "adaptive"),
         })
 
     @app.route("/api/export")

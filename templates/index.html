@@ -204,22 +204,29 @@ async function loadLatest() {
   document.getElementById('usage24h').textContent = rows.length > 1 ? usage24h.toFixed(2) : '--';
 }
 
+let trendYaxis = 'adaptive';
+
 async function loadStatus() {
   const s = await fetchJSON('/api/status');
   document.getElementById('nextRun').textContent = s.next_run || '--';
   const el = document.getElementById('errorInfo');
   if (s.last_error) { el.innerHTML = '<span class="error">错误: ' + s.last_error + '</span>'; }
   else { el.textContent = ''; }
+  if (s.trend_yaxis) trendYaxis = s.trend_yaxis;
 }
 
 async function loadTrend(days) {
   trendDays = days;
   const data = await fetchJSON('/api/readings?days=' + days + roomParam());
+  const values = data.map(r => r.remaining_kwh);
+  const yAxisMin = trendYaxis === 'adaptive' && values.length
+    ? Math.floor(Math.min(...values) * 0.95)
+    : 0;
   trendChart.setOption({
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: data.map(r => r.timestamp.slice(5, 16)) },
-    yAxis: { type: 'value', name: 'kWh' },
-    series: [{ data: data.map(r => r.remaining_kwh), type: 'line', smooth: true,
+    yAxis: { type: 'value', name: 'kWh', min: yAxisMin },
+    series: [{ data: values, type: 'line', smooth: true,
       areaStyle: { color: 'rgba(102,126,234,0.15)' }, lineStyle: { color: '#667eea' },
       itemStyle: { color: '#667eea' } }],
     grid: { left: 50, right: 20, top: 30, bottom: 30 }
@@ -307,8 +314,7 @@ bindBtns('trendBtns', loadTrend);
 bindBtns('usageBtns', loadUsage);
 bindBtns('buildingBtns', loadBuildingChart);
 
-loadBuildings();
-loadStatus();
+loadStatus().then(() => loadBuildings());
 setInterval(() => { loadLatest(); loadStatus(); }, 60000);
 window.addEventListener('resize', () => { trendChart.resize(); usageChart.resize(); buildingChart.resize(); });
 </script>
