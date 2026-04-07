@@ -53,6 +53,10 @@ def create_app(db: Database, scheduler=None, config: dict = None) -> Flask:
     def api_readings():
         days = request.args.get("days", 7, type=int)
         room_id = request.args.get("room_id", None)
+        page = request.args.get("page", None, type=int)
+        page_size = request.args.get("page_size", 20, type=int)
+        if page is not None:
+            return jsonify(db.get_readings_paged(page=page, page_size=page_size, room_id=room_id, days=days))
         if days <= 0:
             readings = db.get_all_readings(room_id=room_id)
         else:
@@ -64,6 +68,12 @@ def create_app(db: Database, scheduler=None, config: dict = None) -> Flask:
         days = request.args.get("days", 30, type=int)
         room_id = request.args.get("room_id", None)
         return jsonify(db.get_daily_usage(days, room_id=room_id))
+
+    @app.route("/api/usage_per_room")
+    def api_usage_per_room():
+        days = request.args.get("days", 1, type=int)
+        building_id = request.args.get("building_id", None)
+        return jsonify(db.get_usage_per_room(days=days, building_id=building_id))
 
     @app.route("/api/trigger_query", methods=["POST"])
     def api_trigger_query():

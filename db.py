@@ -117,6 +117,26 @@ class Database:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def get_readings_paged(self, page: int = 0, page_size: int = 20, room_id: str = None, days: int = 0) -> dict:
+        """分页查询历史记录，返回 {total, rows}"""
+        offset = page * page_size
+        if days > 0:
+            since = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+            where = "WHERE timestamp >= ?" + (" AND room_id = ?" if room_id else "")
+            params = (since, room_id) if room_id else (since,)
+        else:
+            where = ("WHERE room_id = ?" if room_id else "")
+            params = (room_id,) if room_id else ()
+
+        total = self._db.execute(
+            f"SELECT COUNT(*) FROM readings {where}", params
+        ).fetchone()[0]
+        rows = self._db.execute(
+            f"SELECT * FROM readings {where} ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+            (*params, page_size, offset),
+        ).fetchall()
+        return {"total": total, "rows": [dict(r) for r in rows]}
+
     def get_daily_usage(self, days: int = 30, room_id: str = None) -> list[dict]:
         """计算每日用电量（逐条累计下降段，充值不影响结果）"""
         readings = self.get_readings(days, room_id=room_id)
@@ -137,6 +157,42 @@ class Database:
             {"date": date, "usage": round(usage, 2)}
             for date, usage in sorted(daily.items())
         ]
+
+    def get_usage_per_room(self, days: int = 1, building_id: str = None) -> list[dict]:
+        """按房间聚合 N 天内用电量（下降段累计，充值不影响）"""
+        since = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+        if building_id:
+            rows = self._db.execute(
+                "SELECT * FROM readings WHERE timestamp >= ? AND building_id = ? ORDER BY room_id, timestamp",
+                (since, building_id),
+            ).fetchall()
+        else:
+            rows = self._db.execute(
+                "SELECT * FROM readings WHERE timestamp >= ? ORDER BY room_id, timestamp",
+                (since,),
+            ).fetchall()
+
+        usage_map = {}  # room_id -> {usage, room_name, building_id, building_name}
+        prev = {}       # room_id -> last remaining_kwh
+        for r in rows:
+            rid = r["room_id"]
+            cur = r["remaining_kwh"]
+            if rid not in usage_map:
+                usage_map[rid] = {
+                    "room_id": rid,
+                    "room_name": r["room_name"],
+                    "building_id": r["building_id"],
+                    "building_name": r["building_name"],
+                    "usage": 0.0,
+                }
+            if rid in prev and cur < prev[rid]:
+                usage_map[rid]["usage"] += prev[rid] - cur
+            prev[rid] = cur
+
+        result = list(usage_map.values())
+        for r in result:
+            r["usage"] = round(r["usage"], 2)
+        return result
 
     def get_rooms(self, building_id: str = None) -> list[dict]:
         """返回数据库中所有出现过的房间列表，可按楼栋筛选"""

@@ -4,3 +4,4 @@ data/
 *.har
 __pycache__/
 *.pyc
+.claude/

@@ -56,9 +56,15 @@ th { background: #fafafa; font-weight: 600; }
   </div>
 </div>
 <div class="container">
-  <div class="card" style="text-align:center">
-    <h2>当前剩余电量</h2>
-    <div class="big-number"><span id="remaining">--</span> <small>kWh</small></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card" style="text-align:center;margin-bottom:0">
+      <h2>当前剩余电量</h2>
+      <div class="big-number"><span id="remaining">--</span> <small>kWh</small></div>
+    </div>
+    <div class="card" style="text-align:center;margin-bottom:0">
+      <h2>近24小时用电</h2>
+      <div class="big-number"><span id="usage24h">--</span> <small>kWh</small></div>
+    </div>
   </div>
 
   <div class="card">
@@ -84,6 +90,11 @@ th { background: #fafafa; font-weight: 600; }
 
   <div class="card">
     <h2>楼栋电量对比</h2>
+    <div class="controls" id="buildingBtns">
+      <button data-mode="remaining" class="active">当前电量</button>
+      <button data-mode="1">今日用电</button>
+      <button data-mode="7">7天用电</button>
+    </div>
     <div class="chart-box" style="height:400px" id="buildingChart"></div>
   </div>
 
@@ -184,6 +195,13 @@ async function loadLatest() {
     document.getElementById('remaining').textContent = '--';
     document.getElementById('lastTime').textContent = '--';
   }
+  // 计算近24h用电：累计所有下降段
+  let usage24h = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const diff = rows[i - 1].remaining_kwh - rows[i].remaining_kwh;
+    if (diff > 0) usage24h += diff;
+  }
+  document.getElementById('usage24h').textContent = rows.length > 1 ? usage24h.toFixed(2) : '--';
 }
 
 async function loadStatus() {
@@ -221,25 +239,20 @@ async function loadUsage(days) {
   });
 }
 
-function renderTable() {
-  const start = currentPage * pageSize;
-  const page = allReadings.slice(start, start + pageSize);
-  document.getElementById('tableBody').innerHTML = page.map(r =>
+async function loadTable() {
+  const url = '/api/readings?days=0&page=' + currentPage + '&page_size=' + pageSize + roomParam();
+  const result = await fetchJSON(url);
+  totalReadings = result.total;
+  document.getElementById('tableBody').innerHTML = result.rows.map(r =>
     `<tr><td>${r.timestamp}</td><td>${r.remaining_kwh.toFixed(2)}</td><td>${r.total_kwh.toFixed(2)}</td><td>${r.used_kwh.toFixed(2)}</td></tr>`
   ).join('');
-  const total = Math.ceil(allReadings.length / pageSize);
-  document.getElementById('pageInfo').textContent = `${currentPage + 1} / ${total || 1}`;
+  const totalPages = Math.ceil(totalReadings / pageSize);
+  document.getElementById('pageInfo').textContent = `${currentPage + 1} / ${totalPages || 1}`;
   document.getElementById('prevPage').disabled = currentPage <= 0;
-  document.getElementById('nextPage').disabled = currentPage >= total - 1;
+  document.getElementById('nextPage').disabled = currentPage >= totalPages - 1;
 }
 
-function changePage(delta) { currentPage += delta; renderTable(); }
-
-async function loadTable() {
-  allReadings = (await fetchJSON('/api/readings?days=0' + roomParam())).reverse();
-  currentPage = 0;
-  renderTable();
-}
+function changePage(delta) { currentPage += delta; loadTable(); }
 
 function exportData(fmt) { location.href = '/api/export?format=' + fmt + roomParam(); }
 
@@ -249,7 +262,8 @@ function bindBtns(containerId, callback) {
     if (e.target.tagName !== 'BUTTON') return;
     el.querySelectorAll('button').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
-    callback(parseInt(e.target.dataset.days));
+    const val = e.target.dataset.mode !== undefined ? e.target.dataset.mode : parseInt(e.target.dataset.days);
+    callback(val);
   });
 }
 
@@ -259,32 +273,44 @@ function onRoomChange() {
   loadAll();
 }
 
-async function loadBuildingChart() {
-  const rows = await fetchJSON('/api/latest_per_room' + (currentBuildingId ? '?building_id=' + currentBuildingId : ''));
-  const sorted = rows
-    .filter(r => r.remaining_kwh >= 0)
-    .sort((a, b) => a.room_name.localeCompare(b.room_name, 'zh'));
+let buildingMode = 'remaining';
+
+async function loadBuildingChart(mode) {
+  if (mode !== undefined) buildingMode = mode;
+  const bParam = currentBuildingId ? '?building_id=' + currentBuildingId : '';
+  let rows, valueKey, label;
+  if (buildingMode === 'remaining') {
+    rows = await fetchJSON('/api/latest_per_room' + bParam);
+    rows = rows.filter(r => r.remaining_kwh >= 0).sort((a, b) => a.room_name.localeCompare(b.room_name, 'zh'));
+    valueKey = 'remaining_kwh'; label = '剩余电量 (kWh)';
+  } else {
+    const days = parseInt(buildingMode);
+    rows = await fetchJSON('/api/usage_per_room' + bParam + (bParam ? '&' : '?') + 'days=' + days);
+    rows = rows.sort((a, b) => a.room_name.localeCompare(b.room_name, 'zh'));
+    valueKey = 'usage'; label = (days === 1 ? '今日' : days + '天') + '用电量 (kWh)';
+  }
   buildingChart.setOption({
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: sorted.map(r => r.room_name || r.room_id), axisLabel: { rotate: 45, fontSize: 11 } },
+    tooltip: { trigger: 'axis', formatter: p => `${p[0].name}<br/>${label}: <b>${p[0].value}</b>` },
+    xAxis: { type: 'category', data: rows.map(r => r.room_name || r.room_id), axisLabel: { rotate: 45, fontSize: 11 } },
     yAxis: { type: 'value', name: 'kWh' },
-    series: [{ data: sorted.map(r => ({
-        value: r.remaining_kwh,
+    series: [{ data: rows.map(r => ({
+        value: r[valueKey],
         itemStyle: { color: r.room_id === currentRoomId ? '#ff4d4f' : '#667eea', borderRadius: [3, 3, 0, 0] }
       })), type: 'bar' }],
     grid: { left: 50, right: 20, top: 20, bottom: 80 }
   });
 }
 
-function loadAll() { loadLatest(); loadTrend(trendDays); loadUsage(usageDays); loadTable(); loadBuildingChart(); }
+function loadAll() { currentPage = 0; loadLatest(); loadTrend(trendDays); loadUsage(usageDays); loadTable(); loadBuildingChart(); }
 
 bindBtns('trendBtns', loadTrend);
 bindBtns('usageBtns', loadUsage);
+bindBtns('buildingBtns', loadBuildingChart);
 
 loadBuildings();
 loadStatus();
 setInterval(() => { loadLatest(); loadStatus(); }, 60000);
-window.addEventListener('resize', () => { trendChart.resize(); usageChart.resize(); });
+window.addEventListener('resize', () => { trendChart.resize(); usageChart.resize(); buildingChart.resize(); });
 </script>
 </body>
 </html>
