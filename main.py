@@ -60,6 +60,20 @@ def main():
 
     sched.start()
 
+    # 启动时异步登录，失败不阻塞启动，等下次查询时自动重试
+    def _startup_login():
+        import time
+        for i in range(5):
+            try:
+                token_manager.token
+                logger.info("启动登录成功")
+                return
+            except Exception as e:
+                logger.warning("启动登录失败（第%d次）: %s，30秒后重试...", i + 1, e)
+                time.sleep(30)
+        logger.error("启动登录5次均失败，将在下次查询时重试")
+    threading.Thread(target=_startup_login, daemon=True).start()
+
     app = create_app(db, sched, config)
     host = config["server"]["host"]
     port = config["server"]["port"]
