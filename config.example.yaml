@@ -13,18 +13,17 @@ auth:
 api:
   base_url: "https://hxyxh5.csust.edu.cn"
   xiaoqu_id: "1"
-  loudong_id: "楼栋ID"
-  room_id: "房间ID"
   feeitemid: "448"
   type: "IEC"
   level: "3"
 
 # 查询调度（每天固定时间点查询，24小时制）
 schedule:
-  query_hours: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]
+  query_hours: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
   start_immediately: false
 
 # 寝室列表（自动扫描 buildings/ 目录下所有 json 文件）
+# Docker 部署时可通过环境变量 BUILDINGS_DIR 覆盖
 rooms:
   buildings_dir: "buildings"
   query_interval_ms: 2000

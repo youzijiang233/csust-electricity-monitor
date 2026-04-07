@@ -18,13 +18,15 @@ logger = logging.getLogger(__name__)
 
 
 def apply_env_overrides(config: dict):
-    """用环境变量覆盖敏感配置，方便 Docker 部署"""
+    """用环境变量覆盖配置，方便 Docker 部署"""
     if os.environ.get("AUTH_USERNAME"):
         config["auth"]["username"] = os.environ["AUTH_USERNAME"]
     if os.environ.get("AUTH_PASSWORD"):
         config["auth"]["password"] = os.environ["AUTH_PASSWORD"]
     if os.environ.get("DB_PATH"):
         config["database"]["path"] = os.environ["DB_PATH"]
+    if os.environ.get("BUILDINGS_DIR"):
+        config["rooms"]["buildings_dir"] = os.environ["BUILDINGS_DIR"]
 
 
 def console_loop(sched: ElectricityScheduler):
@@ -43,7 +45,11 @@ def console_loop(sched: ElectricityScheduler):
 
 
 def main():
-    with open("config.yaml", "r", encoding="utf-8") as f:
+    config_path = os.environ.get("CONFIG_PATH", "/data/config.yaml")
+    if not os.path.exists(config_path):
+        # 本地开发回退
+        config_path = "config.yaml"
+    with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     apply_env_overrides(config)

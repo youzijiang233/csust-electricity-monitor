@@ -2,19 +2,11 @@ name: csust-electricity-monitor
 
 services:
   electricity-monitor:
-    build: .
+    image: youzijiang/csust-electricity-monitor:latest
     ports:
       - "5000:5000"
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - ./buildings:/app/buildings:ro
-      - electricity_data:/app/data
+      - ./data:/data
     environment:
-      - AUTH_USERNAME=${AUTH_USERNAME:-}
-      - AUTH_PASSWORD=${AUTH_PASSWORD:-}
-      - DB_PATH=/app/data/electricity.db
       - TZ=Asia/Shanghai
     restart: unless-stopped
-
-volumes:
-  electricity_data:

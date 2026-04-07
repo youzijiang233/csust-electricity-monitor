@@ -23,8 +23,8 @@ def fetch_electricity(config: dict, token_manager: TokenManager,
     api = config["api"]
     token = token_manager.token
 
-    rid = room_id or api["room_id"]
-    lid = loudong_id or api["loudong_id"]
+    rid = room_id or api.get("room_id", "")
+    lid = loudong_id or api.get("loudong_id", "")
     resp = requests.post(
         f"{api['base_url']}/charge/feeitem/getThirdData",
         data={

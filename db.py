@@ -118,23 +118,24 @@ class Database:
         return [dict(r) for r in rows]
 
     def get_daily_usage(self, days: int = 30, room_id: str = None) -> list[dict]:
-        """计算每日用电量（当天第一条和最后一条的差值）"""
+        """计算每日用电量（逐条累计下降段，充值不影响结果）"""
         readings = self.get_readings(days, room_id=room_id)
         if not readings:
             return []
 
         daily = {}
+        prev = {}  # room_id -> 上一条 remaining_kwh
         for r in readings:
             date = r["timestamp"][:10]
-            if date not in daily:
-                daily[date] = {"first": r["remaining_kwh"], "last": r["remaining_kwh"]}
-            else:
-                daily[date]["last"] = r["remaining_kwh"]
+            rid = r["room_id"]
+            cur = r["remaining_kwh"]
+            if rid in prev and cur < prev[rid]:
+                daily[date] = daily.get(date, 0) + (prev[rid] - cur)
+            prev[rid] = cur
 
         return [
-            {"date": date, "usage": round(vals["first"] - vals["last"], 2)}
-            for date, vals in sorted(daily.items())
-            if vals["first"] - vals["last"] >= 0
+            {"date": date, "usage": round(usage, 2)}
+            for date, usage in sorted(daily.items())
         ]
 
     def get_rooms(self, building_id: str = None) -> list[dict]:

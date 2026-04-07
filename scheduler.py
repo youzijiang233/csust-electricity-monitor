@@ -69,7 +69,7 @@ class ElectricityScheduler:
         self.scheduler.start()
         logger.info("调度器已启动，每天 %s 点查询，共 %d 个房间", hours_str, len(self._rooms))
 
-        if self.config["schedule"].get("start_immediately", True):
+        if self.config["schedule"].get("start_immediately", False):
             self._query_and_store()
 
     def stop(self):
