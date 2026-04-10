@@ -21,14 +21,20 @@
 
 无需克隆代码，直接拉取镜像运行。
 
-**1. 首次启动，自动生成配置文件**
+**1. 启动容器**
 
 ```bash
 mkdir csust-electricity-monitor && cd csust-electricity-monitor
-docker run --rm -v ./data:/data youzijiang/csust-electricity-monitor:latest
+docker run -d \
+  -v ./data:/data \
+  -p 5000:5000 \
+  -e TZ=Asia/Shanghai \
+  --restart unless-stopped \
+  --name csust-electricity-monitor \
+  youzijiang/csust-electricity-monitor:latest
 ```
 
-容器会在 `./data/` 目录下生成 `config.yaml` 和示例 `buildings/`，然后自动退出并提示你编辑配置。
+容器启动后会自动在 `./data/` 生成 `config.yaml` 和示例 `buildings/`，Web 服务同时启动。
 
 **2. 编辑配置，填入学号和密码**
 
@@ -42,7 +48,13 @@ auth:
   password: "你的统一身份认证密码"
 ```
 
-**4. 添加楼栋数据**
+填完后重启容器生效：
+
+```bash
+docker restart csust-electricity-monitor
+```
+
+**3. 添加楼栋数据**
 
 将楼栋宿舍 json 文件放入 `data/buildings/` 目录，文件名格式：
 
@@ -63,21 +75,9 @@ auth:
 }
 ```
 
-**5. 正式启动**
-
-```bash
-docker run -d \
-  -v ./data:/data \
-  -p 5000:5000 \
-  -e TZ=Asia/Shanghai \
-  --restart unless-stopped \
-  --name csust-electricity-monitor \
-  youzijiang/csust-electricity-monitor:latest
-```
-
 打开浏览器访问 `http://服务器IP:5000`
 
-**6. 查看日志**
+**5. 查看日志**
 
 ```bash
 docker logs -f csust-electricity-monitor

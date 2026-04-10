@@ -21,7 +21,7 @@ fi
 # 检查是否还是默认占位符
 if grep -q "你的学号\|你的统一身份认证密码" "$CONFIG"; then
     echo ">>> 检测到配置文件未填写账号密码，请编辑 $CONFIG 后重新启动容器"
-    exit 0
+    echo ">>> Web 服务已启动，填写完毕后执行 docker restart <容器名> 生效"
 fi
 
 # 升级兼容：检查 config.example.yaml 中有而用户 config.yaml 中缺少的顶级字段
