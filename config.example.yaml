@@ -27,6 +27,9 @@ schedule:
 rooms:
   buildings_dir: "buildings"
   query_interval_ms: 2000
+  # 补查配置：整批查询结束后，对失败的房间统一重试一次
+  retry_wait_ms: 15000       # 整批结束后等待多少毫秒再开始补查
+  retry_interval_ms: 4000    # 补查每个房间之间的间隔
 
 # 数据库
 # Docker 部署时可通过环境变量 DB_PATH 覆盖

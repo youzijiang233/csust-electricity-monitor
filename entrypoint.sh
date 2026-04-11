@@ -35,6 +35,26 @@ for key in $(grep -E '^[a-z]' /app/config.example.yaml | sed 's/:.*//' ); do
         ADDED=1
     fi
 done
+
+# 升级兼容：检查各顶级字段下的子字段是否缺失
+while IFS= read -r line; do
+    # 匹配形如 "  key: value" 的子字段行（2空格缩进，非注释）
+    if echo "$line" | grep -qE '^  [a-z_]+:'; then
+        subkey=$(echo "$line" | sed 's/^ *//' | sed 's/:.*//')
+        # 在用户 config 中查找该子字段（只要出现过即认为存在）
+        if ! grep -q "^\s*${subkey}:" "$CONFIG"; then
+            # 找到这个子字段属于哪个顶级字段，追加到用户 config 对应块后面
+            parent=$(grep -B 20 "^  ${subkey}:" /app/config.example.yaml | grep -E '^[a-z]' | tail -1 | sed 's/:.*//')
+            if [ -n "$parent" ] && grep -q "^${parent}:" "$CONFIG"; then
+                # 在用户 config 中找到父块末尾行号，追加子字段
+                echo "  ${subkey}: $(echo "$line" | sed 's/^[^:]*: *//')" >> "$CONFIG"
+                echo ">>> 新子配置项 '${parent}.${subkey}' 已自动补充到 $CONFIG，请检查"
+                ADDED=1
+            fi
+        fi
+    fi
+done < /app/config.example.yaml
+
 [ $ADDED -eq 1 ] && echo ">>> 配置已更新，建议检查 $CONFIG"
 
 # buildings 目录为空时补充示例数据

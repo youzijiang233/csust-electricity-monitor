@@ -65,11 +65,12 @@ def fetch_electricity(config: dict, token_manager: TokenManager,
 
 
 def fetch_all_rooms(config: dict, token_manager: TokenManager,
-                    rooms: list[dict], interval: float = 2.0):
+                    rooms: list[dict], interval: float = 2.0, label: str = "查询"):
     """
     顺序查询所有房间，每次间隔 interval 秒。
     rooms: [{"name": "A101", "value": "49000"}, ...]
     每查询一条 yield 结果字典，失败时 yield None（含 room_id/room_name）。
+    label: 日志前缀，默认"查询"，补查时传"补查"
     """
     for i, room in enumerate(rooms):
         if i > 0:
@@ -81,11 +82,11 @@ def fetch_all_rooms(config: dict, token_manager: TokenManager,
                                      room_id=room_id, room_name=room_name,
                                      loudong_id=room.get("loudong_id"),
                                      building_name=room.get("building_name"))
-            logger.info("查询成功 [%s/%s] %s: %.2f kWh",
-                        i + 1, len(rooms), room_name, data["remaining_kwh"])
+            logger.info("%s成功 [%s/%s] %s: %.2f kWh",
+                        label, i + 1, len(rooms), room_name, data["remaining_kwh"])
             yield data
         except Exception as e:
-            logger.error("查询失败 [%s/%s] %s: %s", i + 1, len(rooms), room_name, e)
+            logger.error("%s失败 [%s/%s] %s: %s", label, i + 1, len(rooms), room_name, e)
             yield None
 
 

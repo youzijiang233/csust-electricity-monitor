@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import time
 from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -87,19 +88,43 @@ class ElectricityScheduler:
         logger.info("开始批量查询，共 %d 个房间...", len(self._rooms))
         interval = self.config["rooms"].get("query_interval_ms", 2000) / 1000.0
         success = 0
-        fail = 0
-        for data in fetch_all_rooms(self.config, self.token_manager, self._rooms, interval=interval):
+        failed_rooms = []
+        for i, data in enumerate(fetch_all_rooms(self.config, self.token_manager, self._rooms, interval=interval)):
             if data:
                 try:
                     self.db.insert_reading(data)
                     success += 1
                 except Exception as e:
                     logger.error("写入数据库失败 %s: %s", data.get("room_name"), e)
-                    fail += 1
+                    failed_rooms.append(self._rooms[i])
             else:
-                fail += 1
-        self.last_error = f"本轮失败 {fail} 个" if fail else None
-        logger.info("批量查询完成: 成功 %d，失败 %d", success, fail)
+                failed_rooms.append(self._rooms[i])
+
+        # 补查失败的房间
+        if failed_rooms:
+            retry_wait = self.config["rooms"].get("retry_wait_ms", 15000) / 1000.0
+            retry_interval = self.config["rooms"].get("retry_interval_ms", 4000) / 1000.0
+            logger.info("本轮失败 %d 个，等待 %.0f 秒后开始补查...", len(failed_rooms), retry_wait)
+            time.sleep(retry_wait)
+            retry_fail = 0
+            for i, data in enumerate(fetch_all_rooms(self.config, self.token_manager, failed_rooms,
+                                                     interval=retry_interval, label="补查")):
+                if data:
+                    try:
+                        self.db.insert_reading(data)
+                        success += 1
+                    except Exception as e:
+                        logger.error("写入数据库失败 %s: %s", data.get("room_name"), e)
+                        retry_fail += 1
+                else:
+                    retry_fail += 1
+            logger.info("补查完成: 成功 %d，失败 %d", len(failed_rooms) - retry_fail, retry_fail)
+            self.last_error = f"本轮失败 {retry_fail} 个（已补查）" if retry_fail else None
+        else:
+            self.last_error = None
+
+        total_fail = retry_fail if failed_rooms else 0
+        logger.info("批量查询完成: 成功 %d，失败 %d", success, total_fail)
 
     def get_next_run(self) -> str:
         job = self.scheduler.get_job("electricity_query")
