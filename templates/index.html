@@ -79,7 +79,10 @@ th { background: #fafafa; font-weight: 600; }
   </div>
 
   <div class="card">
-    <h2>每日用电量</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin-bottom:0">每日用电量</h2>
+      <span id="usageAvg" style="font-size:13px;color:#888"></span>
+    </div>
     <div class="controls" id="usageBtns">
       <button data-days="7">7天</button>
       <button data-days="30" class="active">30天</button>
@@ -239,6 +242,9 @@ async function loadTrend(days) {
 async function loadUsage(days) {
   usageDays = days;
   const data = await fetchJSON('/api/daily_usage?days=' + days + roomParam());
+  const vals = data.map(r => r.usage);
+  const avg = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '--';
+  document.getElementById('usageAvg').textContent = '日均用电量: ' + avg + ' kWh';
   usageChart.setOption({
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: data.map(r => r.date.slice(5)) },
