@@ -89,7 +89,10 @@ th { background: #fafafa; font-weight: 600; }
   </div>
 
   <div class="card">
-    <h2>楼栋电量对比</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin-bottom:0">楼栋电量对比</h2>
+      <span id="buildingAvg" style="font-size:13px;color:#888"></span>
+    </div>
     <div class="controls" id="buildingBtns">
       <button data-mode="remaining" class="active">当前电量</button>
       <button data-mode="1">今日用电</button>
@@ -285,17 +288,21 @@ let buildingMode = 'remaining';
 async function loadBuildingChart(mode) {
   if (mode !== undefined) buildingMode = mode;
   const bParam = currentBuildingId ? '?building_id=' + currentBuildingId : '';
-  let rows, valueKey, label;
+  let rows, valueKey, label, avgLabel;
   if (buildingMode === 'remaining') {
     rows = await fetchJSON('/api/latest_per_room' + bParam);
     rows = rows.filter(r => r.remaining_kwh >= 0).sort((a, b) => a.room_name.localeCompare(b.room_name, 'zh'));
-    valueKey = 'remaining_kwh'; label = '剩余电量 (kWh)';
+    valueKey = 'remaining_kwh'; label = '剩余电量 (kWh)'; avgLabel = '平均剩余电量';
   } else {
     const days = parseInt(buildingMode);
     rows = await fetchJSON('/api/usage_per_room' + bParam + (bParam ? '&' : '?') + 'days=' + days);
     rows = rows.sort((a, b) => a.room_name.localeCompare(b.room_name, 'zh'));
     valueKey = 'usage'; label = (days === 1 ? '今日' : days + '天') + '用电量 (kWh)';
+    avgLabel = (days === 1 ? '今日' : days + '天') + '平均用电量';
   }
+  const vals = rows.map(r => r[valueKey]).filter(v => v != null);
+  const avg = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '--';
+  document.getElementById('buildingAvg').textContent = avgLabel + ': ' + avg + ' kWh';
   buildingChart.setOption({
     tooltip: { trigger: 'axis', formatter: p => `${p[0].name}<br/>${label}: <b>${p[0].value}</b>` },
     xAxis: { type: 'category', data: rows.map(r => r.room_name || r.room_id), axisLabel: { rotate: 45, fontSize: 11 } },

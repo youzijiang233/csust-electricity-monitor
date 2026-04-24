@@ -139,7 +139,7 @@ class Database:
 
     def get_daily_usage(self, days: int = 30, room_id: str = None) -> list[dict]:
         """计算每日用电量（逐条累计下降段，充值不影响结果）"""
-        readings = self.get_readings(days, room_id=room_id)
+        readings = self.get_all_readings(room_id=room_id) if days <= 0 else self.get_readings(days, room_id=room_id)
         if not readings:
             return []
 
