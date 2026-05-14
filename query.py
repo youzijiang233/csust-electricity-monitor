@@ -51,8 +51,10 @@ def fetch_electricity(config: dict, token_manager: TokenManager,
     data = result["map"]["data"]
     show = result["map"]["showData"]
 
+    remaining = show.get("最近剩余电量", show.get("剩余电量", 0))
+
     return {
-        "remaining_kwh": float(show.get("剩余电量", 0)),
+        "remaining_kwh": float(remaining),
         "total_kwh": float(data.get("allAmp", 0)),
         "used_kwh": float(data.get("usedAmp", 0)),
         "room_id": data.get("room_id", rid),
