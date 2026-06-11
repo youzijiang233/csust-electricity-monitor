@@ -7,41 +7,43 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <style>
 :root {
-  --accent: #6366f1;
-  --accent-2: #8b5cf6;
-  --accent-soft: rgba(99,102,241,0.12);
-  --bg: #f4f5fb;
-  --bg-grad-1: #eef0fb;
-  --bg-grad-2: #f6f4fc;
+  --accent: #4f46e5;
+  --accent-2: #7c3aed;
+  --accent-soft: rgba(79,70,229,0.10);
+  --bg: #fafafa;
+  --bg-grad-1: rgba(99,102,241,0.06);
+  --bg-grad-2: rgba(139,92,246,0.05);
   --surface: #ffffff;
-  --surface-2: #f8f9fc;
-  --border: #eaecf2;
-  --text: #1a1d29;
-  --text-soft: #5b6075;
-  --text-faint: #9aa0b4;
-  --shadow: 0 1px 2px rgba(16,24,40,0.04), 0 8px 24px rgba(16,24,40,0.06);
-  --shadow-hover: 0 4px 8px rgba(16,24,40,0.06), 0 16px 40px rgba(16,24,40,0.10);
-  --radius: 18px;
-  --radius-sm: 12px;
-  --good: #10b981;
-  --warn: #f59e0b;
-  --bad: #ef4444;
+  --surface-2: #f7f7f9;
+  --border: #ececef;
+  --border-strong: #e0e0e6;
+  --text: #18181b;
+  --text-soft: #52525b;
+  --text-faint: #a1a1aa;
+  --shadow: 0 1px 2px rgba(24,24,27,0.04);
+  --shadow-hover: 0 1px 2px rgba(24,24,27,0.05), 0 12px 32px rgba(24,24,27,0.08);
+  --radius: 16px;
+  --radius-sm: 11px;
+  --good: #16a34a;
+  --warn: #ea580c;
+  --bad: #dc2626;
 }
 [data-theme="dark"] {
   --accent: #818cf8;
   --accent-2: #a78bfa;
-  --accent-soft: rgba(129,140,248,0.16);
-  --bg: #0b0e1a;
-  --bg-grad-1: #0d1120;
-  --bg-grad-2: #11101e;
-  --surface: #161a2b;
-  --surface-2: #1c2138;
-  --border: #272d44;
-  --text: #eef0f8;
-  --text-soft: #a5acc4;
-  --text-faint: #6b7290;
-  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.4);
-  --shadow-hover: 0 4px 10px rgba(0,0,0,0.4), 0 20px 48px rgba(0,0,0,0.55);
+  --accent-soft: rgba(129,140,248,0.14);
+  --bg: #09090b;
+  --bg-grad-1: rgba(129,140,248,0.07);
+  --bg-grad-2: rgba(167,139,250,0.05);
+  --surface: #121215;
+  --surface-2: #18181c;
+  --border: #26262b;
+  --border-strong: #303036;
+  --text: #fafafa;
+  --text-soft: #a1a1aa;
+  --text-faint: #6b6b73;
+  --shadow: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-hover: 0 1px 2px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.55);
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -69,12 +71,10 @@ body {
 }
 .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
 .brand .logo {
-  width: 40px; height: 40px; border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  display: grid; place-items: center; color: #fff; flex-shrink: 0;
-  box-shadow: 0 6px 16px var(--accent-soft);
+  width: 42px; height: 42px; flex-shrink: 0;
+  display: grid; place-items: center;
 }
-.brand .logo svg { width: 22px; height: 22px; }
+.brand .logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .brand .titles h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
 .brand .titles p { font-size: 12px; color: var(--text-faint); margin-top: 1px; }
 .theme-toggle {
@@ -109,19 +109,36 @@ body {
   color: var(--text-faint); width: 16px; height: 16px;
 }
 
-/* ===== Layout ===== */
+/* ===== Layout (bento grid) ===== */
 .container { max-width: 1120px; margin: 0 auto; padding: 20px; }
 .grid-stats {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px;
 }
-@media (max-width: 720px) { .grid-stats { grid-template-columns: 1fr; } }
+.span-2 { grid-column: span 2; }
+@media (max-width: 900px) {
+  .grid-stats { grid-template-columns: repeat(2, 1fr); }
+  .span-2 { grid-column: span 2; }
+}
+@media (max-width: 560px) {
+  .grid-stats { grid-template-columns: 1fr; }
+  .span-2 { grid-column: span 1; }
+}
 
 .card {
+  position: relative; overflow: hidden;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 22px;
   box-shadow: var(--shadow); transition: box-shadow 0.25s, transform 0.25s, border-color 0.25s;
 }
-.card:hover { box-shadow: var(--shadow-hover); }
+/* spotlight follows cursor */
+.card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  transition: opacity 0.3s;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), var(--accent-soft), transparent 60%);
+}
+.card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); border-color: var(--border-strong); }
+.card:hover::before { opacity: 1; }
+.card > * { position: relative; }
 .card-head {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 16px; gap: 12px;
@@ -131,6 +148,15 @@ body {
 
 /* ===== Stat cards ===== */
 .stat { display: flex; flex-direction: column; gap: 12px; }
+.stat.hero {
+  flex-direction: row; align-items: stretch; justify-content: space-between; gap: 16px;
+  background:
+    radial-gradient(600px circle at 100% 0%, var(--accent-soft), transparent 55%),
+    var(--surface);
+}
+.hero-left { display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+.hero-spark { flex: 1; min-width: 0; align-self: stretch; max-width: 55%; }
+@media (max-width: 560px) { .hero-spark { display: none; } }
 .stat .stat-top { display: flex; align-items: center; gap: 10px; }
 .stat .icon {
   width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0;
@@ -141,6 +167,8 @@ body {
 .icon.i-good { background: rgba(16,185,129,0.14); color: var(--good); }
 .stat .label { font-size: 13px; color: var(--text-soft); font-weight: 550; }
 .stat .value { font-size: 40px; font-weight: 750; letter-spacing: -0.025em; line-height: 1; }
+.stat .value.value-xl { font-size: 52px; }
+@media (max-width: 560px) { .stat .value.value-xl { font-size: 42px; } }
 .stat .value .unit { font-size: 16px; font-weight: 600; color: var(--text-faint); margin-left: 4px; }
 .stat .meta { font-size: 12px; color: var(--text-faint); }
 .badge {
@@ -152,10 +180,10 @@ body {
 .badge.b-bad { background: rgba(239,68,68,0.13); color: var(--bad); }
 .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
-/* ===== Status pills (header strip) ===== */
+/* ===== Status pills (in header row, right side) ===== */
 .status-strip {
-  max-width: 1120px; margin: 14px auto 0; padding: 0 20px;
-  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-left: auto;
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
 }
 .pill {
   display: inline-flex; align-items: center; gap: 7px;
@@ -238,6 +266,58 @@ td.num { font-weight: 600; }
 
 /* skeleton shimmer for loading values */
 .shimmer { color: var(--text-faint); }
+
+/* ===== Mobile optimizations ===== */
+@media (max-width: 640px) {
+  /* header: 状态药丸整组换到第二行占满，主题按钮留在品牌行右侧 */
+  .topbar-inner { padding: 12px 16px; gap: 12px; row-gap: 10px; }
+  .brand .logo { width: 38px; height: 38px; }
+  .brand .titles h1 { font-size: 15px; }
+  .brand .titles p { font-size: 11px; }
+  .status-strip {
+    order: 3; width: 100%; margin-left: 0;
+    gap: 8px; justify-content: flex-start;
+  }
+  .pill { flex: 1; min-width: 0; justify-content: center; padding: 7px 10px; font-size: 12px; }
+  .pill.err { flex-basis: 100%; }
+
+  /* selectors 占满整行堆叠 */
+  .selector-bar { padding: 14px 16px 0; gap: 10px; }
+  .field { min-width: 0; flex-basis: 100%; }
+
+  /* container & cards 更紧凑 */
+  .container { padding: 16px; }
+  .grid-stats { gap: 12px; margin-bottom: 12px; }
+  .card { padding: 16px; border-radius: 14px; }
+  .section-gap { margin-bottom: 12px; }
+
+  /* card 头部：标题与分段控件换行 */
+  .card-head { flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .card-head h2 { font-size: 14px; }
+  .segment { width: 100%; justify-content: space-between; }
+  .segment button { flex: 1; padding: 7px 4px; text-align: center; font-size: 12.5px; }
+
+  /* hero 卡纵向排列、缩小数值 */
+  .stat.hero { flex-direction: column; }
+  .stat .value.value-xl { font-size: 40px; }
+  .stat .value { font-size: 34px; }
+
+  /* 图表降低高度，手机上更协调 */
+  .chart-box { height: 240px; }
+  .chart-tall { height: 320px; }
+
+  /* 表格更紧凑，禁用 hover 位移 */
+  table { font-size: 12.5px; }
+  thead th { padding: 10px 12px; }
+  tbody td { padding: 10px 12px; }
+  .card:hover { transform: none; }
+
+  /* 导出按钮占满整行 */
+  .btn-row { width: 100%; }
+  .btn-row .btn { flex: 1; justify-content: center; }
+
+  .footer { padding: 24px 16px 32px; }
+}
 </style>
 </head>
 <body>
@@ -245,28 +325,28 @@ td.num { font-weight: 600; }
   <div class="topbar-inner">
     <div class="brand">
       <div class="logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
+        <img src="{{ url_for('static', filename='csust-logo.png') }}" alt="长沙理工大学校徽">
       </div>
       <div class="titles">
         <h1>电费监控</h1>
         <p>长沙理工大学 · 宿舍用电仪表盘</p>
       </div>
     </div>
+    <div class="status-strip">
+      <span class="pill">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        上次查询 <b id="lastTime">--</b>
+      </span>
+      <span class="pill">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M5.6 5.6l2.9 2.9M3 12h4M5.6 18.4l2.9-2.9M12 21v-4M18.4 18.4l-2.9-2.9M21 12h-4M18.4 5.6l-2.9 2.9"/></svg>
+        下次查询 <b id="nextRun">--</b>
+      </span>
+      <span class="pill err" id="errorPill" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+        <span id="errorText"></span>
+      </span>
+    </div>
     <button class="theme-toggle" id="themeToggle" title="切换主题" aria-label="切换主题"></button>
-  </div>
-  <div class="status-strip">
-    <span class="pill">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-      上次查询 <b id="lastTime">--</b>
-    </span>
-    <span class="pill">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M5.6 5.6l2.9 2.9M3 12h4M5.6 18.4l2.9-2.9M12 21v-4M18.4 18.4l-2.9-2.9M21 12h-4M18.4 5.6l-2.9 2.9"/></svg>
-      下次查询 <b id="nextRun">--</b>
-    </span>
-    <span class="pill err" id="errorPill" style="display:none">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-      <span id="errorText"></span>
-    </span>
   </div>
 </header>
 
@@ -284,15 +364,18 @@ td.num { font-weight: 600; }
 </div>
 
 <div class="container">
-  <!-- Stat cards -->
+  <!-- Stat cards (bento) -->
   <div class="grid-stats">
-    <div class="card stat">
-      <div class="stat-top">
-        <div class="icon i-accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg></div>
-        <span class="label">当前剩余电量</span>
+    <div class="card stat span-2 hero">
+      <div class="hero-left">
+        <div class="stat-top">
+          <div class="icon i-accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg></div>
+          <span class="label">当前剩余电量</span>
+        </div>
+        <div class="value value-xl"><span id="remaining" class="shimmer">--</span><span class="unit">kWh</span></div>
+        <div class="meta"><span class="badge b-good" id="remainBadge" style="display:none"><span class="dot"></span><span id="remainBadgeText">充足</span></span></div>
       </div>
-      <div class="value"><span id="remaining" class="shimmer">--</span><span class="unit">kWh</span></div>
-      <div class="meta"><span class="badge b-good" id="remainBadge" style="display:none"><span class="dot"></span><span id="remainBadgeText">充足</span></span></div>
+      <div class="hero-spark" id="heroSpark"></div>
     </div>
     <div class="card stat">
       <div class="stat-top">
@@ -453,6 +536,7 @@ function baseTooltip(ct) {
 const trendChart = echarts.init(document.getElementById('trendChart'));
 const usageChart = echarts.init(document.getElementById('usageChart'));
 const buildingChart = echarts.init(document.getElementById('buildingChart'));
+const heroSpark = echarts.init(document.getElementById('heroSpark'));
 let currentPage = 0, pageSize = 20, totalReadings = 0;
 let currentRoomId = '', currentBuildingId = '';
 let trendDays = 7, usageDays = 30, buildingMode = 'remaining';
@@ -538,6 +622,24 @@ async function loadLatest() {
   const el = document.getElementById('usage24h');
   el.textContent = rows.length > 1 ? usage24h.toFixed(2) : '--';
   el.classList.remove('shimmer');
+  drawHeroSpark(rows.map(r => r.remaining_kwh));
+}
+
+function drawHeroSpark(values) {
+  const ct = chartTheme();
+  if (!values || values.length < 2) { heroSpark.clear(); return; }
+  heroSpark.setOption({
+    grid: { left: 0, right: 0, top: 6, bottom: 6 },
+    xAxis: { type: 'category', show: false, boundaryGap: false, data: values.map((_, i) => i) },
+    yAxis: { type: 'value', show: false, min: Math.min(...values) * 0.96, max: Math.max(...values) * 1.02 },
+    series: [{
+      data: values, type: 'line', smooth: true, showSymbol: false,
+      lineStyle: { color: ct.accent, width: 2.5 },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: ct.accent + '40' }, { offset: 1, color: ct.accent + '00' }
+      ]) }
+    }]
+  }, true);
 }
 
 async function loadStatus() {
@@ -636,7 +738,7 @@ async function loadBuildingChart(mode) {
 }
 
 function refreshChartsTheme() {
-  loadTrend(trendDays); loadUsage(usageDays); loadBuildingChart();
+  loadTrend(trendDays); loadUsage(usageDays); loadBuildingChart(); loadLatest();
 }
 
 /* ===== Table ===== */
@@ -695,7 +797,16 @@ bindBtns('buildingBtns', loadBuildingChart);
 
 loadStatus().then(() => loadBuildings());
 setInterval(() => { loadLatest(); loadStatus(); }, 60000);
-window.addEventListener('resize', () => { trendChart.resize(); usageChart.resize(); buildingChart.resize(); });
+window.addEventListener('resize', () => { trendChart.resize(); usageChart.resize(); buildingChart.resize(); heroSpark.resize(); });
+
+/* spotlight hover — track cursor position per card */
+document.addEventListener('pointermove', e => {
+  const card = e.target.closest('.card');
+  if (!card) return;
+  const r = card.getBoundingClientRect();
+  card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+  card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+});
 </script>
 </body>
 </html>
