@@ -656,7 +656,7 @@ async function loadStatus() {
 /* ===== Charts ===== */
 async function loadTrend(days) {
   trendDays = days;
-  const data = await fetchJSON('/api/readings?days=' + days + roomParam());
+  const data = await fetchJSON('/api/readings?days=' + days + '&fields=trend' + roomParam());
   const values = data.map(r => r.remaining_kwh);
   const ct = chartTheme();
   const yAxisMin = trendYaxis === 'adaptive' && values.length ? Math.floor(Math.min(...values) * 0.95) : 0;
