@@ -41,6 +41,12 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_readings_room_ts
             ON readings(room_id, timestamp)
         """)
+        # 复合索引：按楼栋取房间列表 / 每房间最新状态（get_rooms、get_latest_per_room）
+        # (building_id, room_id, timestamp) 可作覆盖索引，避免全表扫描
+        self._db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_readings_bld_room_ts
+            ON readings(building_id, room_id, timestamp)
+        """)
         # 兼容旧数据库：若列不存在则添加
         cols = [r[1] for r in self._db.execute("PRAGMA table_info(readings)").fetchall()]
         if "room_name" not in cols:
@@ -206,20 +212,22 @@ class Database:
 
     def get_rooms(self, building_id: str = None) -> list[dict]:
         """返回数据库中所有出现过的房间列表，可按楼栋筛选"""
+        # 用 GROUP BY room_id 替代 DISTINCT 四列，可走覆盖索引、避免临时 B-tree 去重
         if building_id:
             rows = self._db.execute(
-                "SELECT DISTINCT room_id, room_name, building_id, building_name FROM readings WHERE building_id = ? ORDER BY room_id",
+                "SELECT room_id, room_name, building_id, building_name FROM readings WHERE building_id = ? GROUP BY room_id ORDER BY room_id",
                 (building_id,),
             ).fetchall()
         else:
             rows = self._db.execute(
-                "SELECT DISTINCT room_id, room_name, building_id, building_name FROM readings ORDER BY room_id"
+                "SELECT room_id, room_name, building_id, building_name FROM readings GROUP BY room_id ORDER BY room_id"
             ).fetchall()
         return [dict(r) for r in rows]
 
     def get_buildings(self) -> list[dict]:
         """返回数据库中所有出现过的楼栋列表"""
+        # GROUP BY building_id 可走 idx_readings_bld_room_ts 覆盖索引，避免全表 DISTINCT
         rows = self._db.execute(
-            "SELECT DISTINCT building_id, building_name FROM readings ORDER BY building_id"
+            "SELECT building_id, building_name FROM readings GROUP BY building_id ORDER BY building_id"
         ).fetchall()
         return [dict(r) for r in rows]
