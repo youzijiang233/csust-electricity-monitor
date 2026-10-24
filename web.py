@@ -1,5 +1,6 @@
 """Flask Web 仪表盘"""
 
+import gzip
 from datetime import datetime, timedelta
 
 from flask import Flask, jsonify, request, render_template, Response
@@ -23,6 +24,30 @@ def _calc_next_run(query_hours: list[int]) -> str:
 
 def create_app(db: Database, scheduler=None, config: dict = None) -> Flask:
     app = Flask(__name__)
+
+    @app.after_request
+    def _gzip(response: Response) -> Response:
+        # 仅压缩客户端支持 gzip、体积够大、尚未编码的文本类响应
+        accept = request.headers.get("Accept-Encoding", "")
+        if (
+            "gzip" not in accept.lower()
+            or response.direct_passthrough
+            or response.status_code < 200
+            or response.status_code >= 300
+            or "Content-Encoding" in response.headers
+            or response.content_length is None
+            or response.content_length < 500
+        ):
+            return response
+        ctype = response.content_type or ""
+        if not (ctype.startswith("application/json") or ctype.startswith("text/")):
+            return response
+        compressed = gzip.compress(response.get_data(), compresslevel=6)
+        response.set_data(compressed)
+        response.headers["Content-Encoding"] = "gzip"
+        response.headers["Content-Length"] = len(compressed)
+        response.headers.add("Vary", "Accept-Encoding")
+        return response
 
     @app.route("/")
     def index():
@@ -55,12 +80,14 @@ def create_app(db: Database, scheduler=None, config: dict = None) -> Flask:
         room_id = request.args.get("room_id", None)
         page = request.args.get("page", None, type=int)
         page_size = request.args.get("page_size", 20, type=int)
+        # 趋势图只需要 timestamp + remaining_kwh，避免传输庞大的 raw_json
+        cols = "timestamp, remaining_kwh" if request.args.get("fields") == "trend" else "*"
         if page is not None:
             return jsonify(db.get_readings_paged(page=page, page_size=page_size, room_id=room_id, days=days))
         if days <= 0:
-            readings = db.get_all_readings(room_id=room_id)
+            readings = db.get_all_readings(room_id=room_id, columns=cols)
         else:
-            readings = db.get_readings(days, room_id=room_id)
+            readings = db.get_readings(days, room_id=room_id, columns=cols)
         return jsonify(readings)
 
     @app.route("/api/daily_usage")

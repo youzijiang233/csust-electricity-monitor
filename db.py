@@ -36,6 +36,17 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_readings_room_id
             ON readings(room_id)
         """)
+        # 复合索引：几乎所有查询都是 WHERE timestamp >= ? AND room_id = ?
+        self._db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_readings_room_ts
+            ON readings(room_id, timestamp)
+        """)
+        # 复合索引：按楼栋取房间列表 / 每房间最新状态（get_rooms、get_latest_per_room）
+        # (building_id, room_id, timestamp) 可作覆盖索引，避免全表扫描
+        self._db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_readings_bld_room_ts
+            ON readings(building_id, room_id, timestamp)
+        """)
         # 兼容旧数据库：若列不存在则添加
         cols = [r[1] for r in self._db.execute("PRAGMA table_info(readings)").fetchall()]
         if "room_name" not in cols:
@@ -91,29 +102,29 @@ class Database:
             """).fetchall()
         return [dict(r) for r in rows]
 
-    def get_readings(self, days: int = 7, room_id: str = None) -> list[dict]:
+    def get_readings(self, days: int = 7, room_id: str = None, columns: str = "*") -> list[dict]:
         since = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
         if room_id:
             rows = self._db.execute(
-                "SELECT * FROM readings WHERE timestamp >= ? AND room_id = ? ORDER BY timestamp",
+                f"SELECT {columns} FROM readings WHERE timestamp >= ? AND room_id = ? ORDER BY timestamp",
                 (since, room_id),
             ).fetchall()
         else:
             rows = self._db.execute(
-                "SELECT * FROM readings WHERE timestamp >= ? ORDER BY timestamp",
+                f"SELECT {columns} FROM readings WHERE timestamp >= ? ORDER BY timestamp",
                 (since,),
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_all_readings(self, room_id: str = None) -> list[dict]:
+    def get_all_readings(self, room_id: str = None, columns: str = "*") -> list[dict]:
         if room_id:
             rows = self._db.execute(
-                "SELECT * FROM readings WHERE room_id = ? ORDER BY timestamp",
+                f"SELECT {columns} FROM readings WHERE room_id = ? ORDER BY timestamp",
                 (room_id,),
             ).fetchall()
         else:
             rows = self._db.execute(
-                "SELECT * FROM readings ORDER BY timestamp"
+                f"SELECT {columns} FROM readings ORDER BY timestamp"
             ).fetchall()
         return [dict(r) for r in rows]
 
@@ -132,14 +143,18 @@ class Database:
             f"SELECT COUNT(*) FROM readings {where}", params
         ).fetchone()[0]
         rows = self._db.execute(
-            f"SELECT * FROM readings {where} ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+            f"SELECT timestamp, remaining_kwh, total_kwh, used_kwh FROM readings {where} ORDER BY timestamp DESC LIMIT ? OFFSET ?",
             (*params, page_size, offset),
         ).fetchall()
         return {"total": total, "rows": [dict(r) for r in rows]}
 
     def get_daily_usage(self, days: int = 30, room_id: str = None) -> list[dict]:
         """计算每日用电量（逐条累计下降段，充值不影响结果）"""
-        readings = self.get_all_readings(room_id=room_id) if days <= 0 else self.get_readings(days, room_id=room_id)
+        readings = (
+            self.get_all_readings(room_id=room_id, columns="timestamp, remaining_kwh, room_id")
+            if days <= 0
+            else self.get_readings(days, room_id=room_id, columns="timestamp, remaining_kwh, room_id")
+        )
         if not readings:
             return []
 
@@ -161,14 +176,15 @@ class Database:
     def get_usage_per_room(self, days: int = 1, building_id: str = None) -> list[dict]:
         """按房间聚合 N 天内用电量（下降段累计，充值不影响）"""
         since = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+        cols = "room_id, room_name, building_id, building_name, remaining_kwh"
         if building_id:
             rows = self._db.execute(
-                "SELECT * FROM readings WHERE timestamp >= ? AND building_id = ? ORDER BY room_id, timestamp",
+                f"SELECT {cols} FROM readings WHERE timestamp >= ? AND building_id = ? ORDER BY room_id, timestamp",
                 (since, building_id),
             ).fetchall()
         else:
             rows = self._db.execute(
-                "SELECT * FROM readings WHERE timestamp >= ? ORDER BY room_id, timestamp",
+                f"SELECT {cols} FROM readings WHERE timestamp >= ? ORDER BY room_id, timestamp",
                 (since,),
             ).fetchall()
 
@@ -196,20 +212,22 @@ class Database:
 
     def get_rooms(self, building_id: str = None) -> list[dict]:
         """返回数据库中所有出现过的房间列表，可按楼栋筛选"""
+        # 用 GROUP BY room_id 替代 DISTINCT 四列，可走覆盖索引、避免临时 B-tree 去重
         if building_id:
             rows = self._db.execute(
-                "SELECT DISTINCT room_id, room_name, building_id, building_name FROM readings WHERE building_id = ? ORDER BY room_id",
+                "SELECT room_id, room_name, building_id, building_name FROM readings WHERE building_id = ? GROUP BY room_id ORDER BY room_id",
                 (building_id,),
             ).fetchall()
         else:
             rows = self._db.execute(
-                "SELECT DISTINCT room_id, room_name, building_id, building_name FROM readings ORDER BY room_id"
+                "SELECT room_id, room_name, building_id, building_name FROM readings GROUP BY room_id ORDER BY room_id"
             ).fetchall()
         return [dict(r) for r in rows]
 
     def get_buildings(self) -> list[dict]:
         """返回数据库中所有出现过的楼栋列表"""
+        # GROUP BY building_id 可走 idx_readings_bld_room_ts 覆盖索引，避免全表 DISTINCT
         rows = self._db.execute(
-            "SELECT DISTINCT building_id, building_name FROM readings ORDER BY building_id"
+            "SELECT building_id, building_name FROM readings GROUP BY building_id ORDER BY building_id"
         ).fetchall()
         return [dict(r) for r in rows]
