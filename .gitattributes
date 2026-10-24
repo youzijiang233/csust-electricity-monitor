@@ -1,0 +1,5 @@
+# 强制 shell 脚本与 Dockerfile 使用 LF 行尾。
+# Windows 上 core.autocrlf=true 会把 entrypoint.sh 转成 CRLF，
+# 导致容器里 shebang 变成 #!/bin/sh\r 而无法执行（exec ... no such file or directory）。
+*.sh text eol=lf
+Dockerfile text eol=lf
